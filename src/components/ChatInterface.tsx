@@ -50,6 +50,8 @@ interface UserData {
   role: 'admin' | 'user';
   isVerified: boolean;
   status: 'Uji Coba' | 'Pro';
+  deviceId?: string;
+  createdAt?: string;
 }
 
 const TEMPLATES = [
@@ -104,10 +106,12 @@ export const ChatInterface: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [apiKeys, setApiKeys] = useState<{ geminiApiKey?: string; deepseekApiKey?: string }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -149,6 +153,21 @@ export const ChatInterface: React.FC = () => {
           status: 'Pro'
         });
       }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `users/${user.uid}`);
+    });
+    return unsubscribe;
+  }, [user]);
+
+  // Listen for API keys
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onSnapshot(doc(db, "settings", "api_keys"), (doc) => {
+      if (doc.exists()) {
+        setApiKeys(doc.data());
+      }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, "settings/api_keys");
     });
     return unsubscribe;
   }, [user]);
@@ -160,6 +179,8 @@ export const ChatInterface: React.FC = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const users = snapshot.docs.map(d => d.data() as UserData);
       setAllUsers(users);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, "users");
     });
     return unsubscribe;
   }, [userData]);
@@ -305,7 +326,8 @@ export const ChatInterface: React.FC = () => {
       const response = await generateCode(
         [...messages, { role: "user", content: finalInput }], 
         SYSTEM_INSTRUCTION,
-        userData?.status === 'Pro'
+        userData?.status === 'Pro',
+        apiKeys.geminiApiKey
       );
       
       // Add assistant message to Firestore
@@ -336,15 +358,19 @@ export const ChatInterface: React.FC = () => {
 
   const deleteSession = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this session?")) {
-      try {
-        await deleteDoc(doc(db, "sessions", id));
-        if (currentSessionId === id) {
-          clearChat();
-        }
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `sessions/${id}`);
+    setSessionToDelete(id);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    try {
+      await deleteDoc(doc(db, "sessions", sessionToDelete));
+      if (currentSessionId === sessionToDelete) {
+        clearChat();
       }
+      setSessionToDelete(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `sessions/${sessionToDelete}`);
     }
   };
 
@@ -359,13 +385,60 @@ export const ChatInterface: React.FC = () => {
         status: status
       }, { merge: true });
     } catch (err) {
-      console.error("Error verifying user:", err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${uid}`);
     }
   };
 
   return (
     <div className="flex h-full bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 overflow-hidden">
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        isAdmin={userData?.role === 'admin'}
+        allUsers={allUsers}
+        onVerifyUser={verifyUser}
+        onLogout={handleLogout}
+        currentUserEmail={user?.email}
+      />
+
+      <AnimatePresence>
+        {sessionToDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSessionToDelete(null)}
+              className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-6"
+            >
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white">Hapus Sesi?</h3>
+                <p className="text-sm text-zinc-400">Apakah Anda yakin ingin menghapus sesi ini? Tindakan ini tidak dapat dibatalkan.</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSessionToDelete(null)}
+                  className="flex-1 px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-bold text-sm hover:bg-zinc-700 transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmDeleteSession}
+                  className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-all"
+                >
+                  Hapus
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       
       {/* Sidebar */}
       <motion.aside
@@ -448,54 +521,6 @@ export const ChatInterface: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {userData?.role === 'admin' && (
-              <div className="space-y-1 pt-4">
-                <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-3 mb-2">User Management</p>
-                <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-none">
-                  {allUsers.filter(u => u.uid !== user?.uid).length === 0 ? (
-                    <p className="text-[10px] text-zinc-600 px-3 italic">No other users yet</p>
-                  ) : (
-                    allUsers.filter(u => u.uid !== user?.uid).map((u) => (
-                      <div key={u.uid} className="p-2 px-3 rounded-lg bg-zinc-800/30 border border-zinc-800 text-[11px] space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-zinc-300 truncate font-medium">{u.email}</span>
-                          {u.isVerified ? (
-                            <CheckCircle size={12} className="text-emerald-500" />
-                          ) : (
-                            <Clock size={12} className="text-yellow-500" />
-                          )}
-                        </div>
-                        <div className="flex gap-1">
-                          <button 
-                            onClick={() => verifyUser(u.uid, 'Pro')}
-                            className={cn(
-                              "flex-1 py-1 rounded text-[9px] font-bold uppercase transition-all",
-                              u.status === 'Pro' 
-                                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" 
-                                : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400"
-                            )}
-                          >
-                            Pro
-                          </button>
-                          <button 
-                            onClick={() => verifyUser(u.uid, 'Uji Coba')}
-                            className={cn(
-                              "flex-1 py-1 rounded text-[9px] font-bold uppercase transition-all",
-                              u.status === 'Uji Coba' || !u.status
-                                ? "bg-zinc-600 text-white" 
-                                : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
-                            )}
-                          >
-                            Trial
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="mt-auto pt-6 border-t border-zinc-800/50 space-y-2">
@@ -531,13 +556,6 @@ export const ChatInterface: React.FC = () => {
             >
               <Settings size={18} />
               <span>Settings</span>
-            </button>
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-red-500/10 text-zinc-400 hover:text-red-400 text-sm transition-colors"
-            >
-              <LogOut size={18} />
-              <span>Sign Out</span>
             </button>
           </div>
         </div>

@@ -8,10 +8,15 @@ export interface Message {
   content: string;
 }
 
-export async function generateCode(messages: Message[], systemInstruction: string, isPro: boolean = false) {
-  const apiKey = process.env.GEMINI_API_KEY;
+export async function generateCode(
+  messages: Message[], 
+  systemInstruction: string, 
+  isPro: boolean = false,
+  customApiKey?: string
+) {
+  const apiKey = customApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
+    throw new Error("GEMINI_API_KEY is not configured. Please set it in Settings (Admin) or environment variables.");
   }
 
   const ai = new GoogleGenAI({ apiKey });

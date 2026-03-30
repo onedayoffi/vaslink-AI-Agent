@@ -1,5 +1,7 @@
 import React from "react";
 import { Check, Copy, Download } from "lucide-react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface CodeBlockProps {
   language?: string;
@@ -57,10 +59,25 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
           </button>
         </div>
       </div>
-      <div className="p-4 overflow-auto flex-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-        <pre className="text-sm font-mono text-zinc-100 leading-relaxed">
-          <code>{value}</code>
-        </pre>
+      <div className="overflow-auto flex-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+        <SyntaxHighlighter
+          language={language || "javascript"}
+          style={vscDarkPlus}
+          customStyle={{
+            margin: 0,
+            padding: "1rem",
+            fontSize: "0.875rem",
+            lineHeight: "1.5",
+            background: "transparent",
+          }}
+          codeTagProps={{
+            style: {
+              fontFamily: 'JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            }
+          }}
+        >
+          {value}
+        </SyntaxHighlighter>
       </div>
     </div>
   );

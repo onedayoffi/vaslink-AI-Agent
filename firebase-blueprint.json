@@ -38,9 +38,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "role", "content", "createdAt"]
+    },
+    "AppSetting": {
+      "title": "AppSetting",
+      "description": "Global application settings",
+      "type": "object",
+      "properties": {
+        "geminiApiKey": { "type": "string" },
+        "deepseekApiKey": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
+    "/settings/{settingId}": {
+      "schema": "AppSetting",
+      "description": "Global settings documents"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User documents"
