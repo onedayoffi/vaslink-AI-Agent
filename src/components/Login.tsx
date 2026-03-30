@@ -117,8 +117,8 @@ export const Login: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-[#1A2335] border border-[#2A3450] rounded-2xl p-8 shadow-2xl"
       >
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-48 h-48 rounded-2xl bg-[#1A2335] border border-[#2A3450] flex items-center justify-center mb-4 shadow-lg overflow-hidden">
+        <div className="flex flex-col items-center">
+          <div className="w-48 h-fit-content flex items-center justify-center overflow-hidden">
             <img 
               src="https://vaslink.site/logo-vaslink-code.png" 
               alt="Vaslink Logo" 
@@ -126,8 +126,7 @@ export const Login: React.FC = () => {
               referrerPolicy="no-referrer" 
             />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Vaslink Agent</h1>
-          <p className="text-[#8096B0] text-sm mt-2">
+          <p className="text-[#8096B0] mb-8 text-sm mt-2">
             {isRegistering ? 'Create your account' : 'Sign in to access your coding sessions'}
           </p>
         </div>
