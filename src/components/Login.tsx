@@ -4,7 +4,9 @@ import {
   createUserWithEmailAndPassword, 
   setPersistence, 
   browserLocalPersistence, 
-  browserSessionPersistence 
+  browserSessionPersistence,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -29,6 +31,37 @@ export const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+
+  const handleGoogleAuth = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+      
+      // Check if user doc exists, if not create it
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists()) {
+        const deviceId = getDeviceId();
+        const isAdminEmail = user.email === 'admin@vaslink.site' || user.email === 'yanadreamer@gmail.com';
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: user.email,
+          role: isAdminEmail ? 'admin' : 'user',
+          isVerified: isAdminEmail,
+          status: isAdminEmail ? 'Pro' : 'Uji Coba',
+          deviceId: deviceId,
+          createdAt: new Date().toISOString()
+        });
+      }
+    } catch (err: any) {
+      console.error("Google Auth error:", err);
+      setError(`Terjadi kesalahan saat login dengan Google: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,13 +88,15 @@ export const Login: React.FC = () => {
           throw new Error('LIMIT_REACHED');
         }
         
+        const isAdminEmail = email === 'admin@vaslink.site' || email === 'yanadreamer@gmail.com';
+        
         // Initialize user doc with "Uji Coba" status and deviceId
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           email: user.email,
-          role: email === 'admin@vaslink.site' ? 'admin' : 'user',
-          isVerified: email === 'admin@vaslink.site', // Auto-verify admin
-          status: email === 'admin@vaslink.site' ? 'Pro' : 'Uji Coba',
+          role: isAdminEmail ? 'admin' : 'user',
+          isVerified: isAdminEmail, // Auto-verify admin
+          status: isAdminEmail ? 'Pro' : 'Uji Coba',
           deviceId: deviceId,
           createdAt: new Date().toISOString()
         });
@@ -73,20 +108,21 @@ export const Login: React.FC = () => {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (!userDoc.exists()) {
           const deviceId = getDeviceId();
+          const isAdminEmail = email === 'admin@vaslink.site' || email === 'yanadreamer@gmail.com';
           await setDoc(doc(db, 'users', user.uid), {
             uid: user.uid,
             email: user.email,
-            role: email === 'admin@vaslink.site' ? 'admin' : 'user',
-            isVerified: email === 'admin@vaslink.site', // Auto-verify admin
-            status: email === 'admin@vaslink.site' ? 'Pro' : 'Uji Coba',
+            role: isAdminEmail ? 'admin' : 'user',
+            isVerified: isAdminEmail, // Auto-verify admin
+            status: isAdminEmail ? 'Pro' : 'Uji Coba',
             deviceId: deviceId,
             createdAt: new Date().toISOString()
           });
         }
       }
     } catch (err: any) {
-      console.error("Auth error:", err);
-      let message = "Terjadi kesalahan saat autentikasi.";
+      console.error("Auth error details:", err);
+      let message = `Terjadi kesalahan saat autentikasi: ${err.message || 'Unknown error'}`;
       
       if (err.code === 'auth/invalid-credential') {
         message = "Email atau password salah. Jika Anda baru pertama kali menggunakan aplikasi ini, silakan klik 'Daftar Sekarang' di bawah.";
@@ -102,6 +138,12 @@ export const Login: React.FC = () => {
         message = "Password terlalu lemah. Gunakan minimal 6 karakter.";
       } else if (err.code === 'auth/invalid-email') {
         message = "Format email tidak valid.";
+      } else if (err.code === 'auth/operation-not-allowed') {
+        message = "Metode login Email/Password belum diaktifkan di Firebase Console. Silakan hubungi administrator atau gunakan metode lain.";
+      } else if (err.code === 'auth/network-request-failed') {
+        message = "Koneksi jaringan gagal. Periksa koneksi internet Anda.";
+      } else if (err.code === 'auth/too-many-requests') {
+        message = "Terlalu banyak percobaan login. Silakan coba lagi nanti.";
       }
       
       setError(message);
@@ -197,6 +239,25 @@ export const Login: React.FC = () => {
           >
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
             <span>{isRegistering ? 'Sign Up' : 'Sign In'}</span>
+          </button>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#2A3450]"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-[#111112] px-2 text-[#8096B0]">Or continue with</span>
+            </div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={handleGoogleAuth}
+            disabled={isLoading}
+            className="w-full bg-white hover:bg-gray-100 text-black font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+            <span>Sign in with Google</span>
           </button>
         </form>
 
