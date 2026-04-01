@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Bot, User, Loader2, Sparkles, Terminal, Settings, History, Plus, Github, MessageSquare, Paperclip, X, FileCode, LogOut, Trash2, Shield, CheckCircle, Clock, Layout, ShoppingCart, UserCircle, Link as LinkIcon, ClipboardList } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles, Terminal, Settings, History, Plus, Github, MessageSquare, Paperclip, X, FileCode, LogOut, Trash2, Shield, CheckCircle, Clock, Layout, ShoppingCart, UserCircle, Link as LinkIcon, ClipboardList, Code, Globe, Edit2 } from "lucide-react";
 import { generateCode, Message } from "../services/aiService";
 import { CodeBlock } from "./CodeBlock";
 import { SettingsModal } from "./SettingsModal";
@@ -44,6 +44,23 @@ interface Session {
   updatedAt: any;
 }
 
+interface TemplateQuestion {
+  id: string;
+  label: string;
+  type: 'select' | 'text';
+  options?: string[];
+  placeholder?: string;
+  condition?: (answers: Record<string, string>) => boolean;
+}
+
+interface Template {
+  id: string;
+  name: string;
+  icon: any;
+  prompt: string;
+  questions: TemplateQuestion[];
+}
+
 interface UserData {
   uid: string;
   email: string;
@@ -54,12 +71,116 @@ interface UserData {
   createdAt?: string;
 }
 
-const TEMPLATES = [
-  { id: 'store', name: 'Toko Online', icon: ShoppingCart, prompt: 'Buatkan website Toko Online premium dengan desain minimalis seperti Apple atau Stripe. Sertakan copywriting yang persuasif, halaman katalog produk dengan grid yang elegan (2 kolom di mobile), detail produk yang mendalam, dan sistem keranjang belanja yang intuitif. Gunakan animasi hover yang halus, tipografi yang berkelas (line-height normal di mobile), dan spacing yang pas untuk semua layar.' },
-  { id: 'portfolio', name: 'Web Portfolio', icon: UserCircle, prompt: 'Buatkan website Portfolio kreatif tingkat tinggi (Dribbble style). Sertakan section Hero dengan copywriting yang kuat, About me yang bercerita, Projects dengan layout bento-grid, dan Contact form yang modern. Gunakan efek glassmorphism dan transisi antar section yang mulus.' },
-  { id: 'landing', name: 'Landing Page', icon: Layout, prompt: 'Buatkan Landing Page SaaS kelas dunia. Fokus pada copywriting yang menjual (Problem-Solution-Social Proof). Sertakan pricing table yang clean, FAQ interaktif, dan CTA yang mencolok. Desain harus menggunakan whitespace yang luas dan elemen visual yang tajam.' },
-  { id: 'links', name: 'Daftar Link', icon: LinkIcon, prompt: 'Buatkan aplikasi "Link in Bio" premium. Desain harus sangat estetik dengan background gradient mesh, tombol link dengan efek glassmorphism, dan copywriting profil yang menarik. Pastikan sangat responsif dan terasa seperti aplikasi native.' },
-  { id: 'order', name: 'Form Pemesanan', icon: ClipboardList, prompt: 'Buatkan form pemesanan layanan jasa eksklusif. Sertakan copywriting yang membangun kepercayaan, validasi input real-time yang elegan, dan sistem kalkulasi biaya otomatis yang transparan. Desain harus terlihat profesional dan terpercaya.' },
+const COMMON_QUESTIONS: TemplateQuestion[] = [
+  { id: 'font', label: 'Jenis Font?', type: 'select', options: ['Inter (Modern)', 'Public Sans (Clean)', 'Playfair Display (Elegant)', 'Space Grotesk (Tech)', 'JetBrains Mono (Developer)', 'DM Sans (Geometric)', 'DM Serif (Classic)', 'Montserrat (Bold)'] },
+  { id: 'responsive', label: 'Optimasi Responsive?', type: 'select', options: ['Ultra Responsive (Lebih tipis & rapat di mobile)', 'Standard Responsive'] },
+  { id: 'custom', label: 'Permintaan Khusus (Opsional)', type: 'text', placeholder: 'Misal: Tambahkan animasi scroll, integrasi API, atau fitur spesifik lainnya...' },
+];
+
+const TEMPLATES: Template[] = [
+  { 
+    id: 'website', 
+    name: 'Website Bisnis', 
+    icon: Globe, 
+    prompt: 'Buatkan website profil bisnis profesional tingkat tinggi (Corporate/Agency style). Desain harus sangat modern, bersih, dan menggunakan grid yang presisi. Sertakan section Hero yang impresif, About Us, Services/Products, Portfolio/Gallery, dan Contact. Pastikan copywriting sangat profesional dan relevan dengan industri yang dipilih.',
+    questions: [
+      { id: 'niche', label: 'Jenis Website Bisnis?', type: 'select', options: ['Ekspor Barang', 'Skincare & Beauty', 'Pertanian', 'Pertambangan', 'Perkebunan', 'Elektronik (Handphone)', 'Elektronik (Komputer)', 'Tempat Wisata', 'Restoran & Cafe'] },
+      { id: 'brand_name', label: 'Nama Perusahaan / Brand?', type: 'text', placeholder: 'Masukkan nama bisnis Anda...' },
+      
+      // Ekspor Barang
+      { id: 'ekspor_commodity', label: 'Komoditas Utama?', type: 'select', options: ['Kopi & Teh', 'Rempah-rempah', 'Furniture', 'Tekstil', 'Hasil Laut', 'Lainnya'], condition: (a) => a.niche === 'Ekspor Barang' },
+      { id: 'ekspor_target', label: 'Target Negara?', type: 'text', placeholder: 'Misal: Eropa, Amerika, China...', condition: (a) => a.niche === 'Ekspor Barang' },
+      
+      // Skincare
+      { id: 'skincare_focus', label: 'Fokus Produk?', type: 'select', options: ['Anti-Aging', 'Acne Care', 'Whitening', 'Natural/Organic', 'All-in-one'], condition: (a) => a.niche === 'Skincare & Beauty' },
+      { id: 'skincare_cert', label: 'Sertifikasi?', type: 'select', options: ['BPOM & Halal', 'BPOM Only', 'Dermatology Tested', 'Sedang Proses'], condition: (a) => a.niche === 'Skincare & Beauty' },
+      
+      // Pertanian / Perkebunan
+      { id: 'agri_type', label: 'Hasil Panen Utama?', type: 'select', options: ['Padi/Beras', 'Sayuran Organik', 'Buah-buahan', 'Kelapa Sawit', 'Karet', 'Kopi'], condition: (a) => a.niche === 'Pertanian' || a.niche === 'Perkebunan' },
+      { id: 'agri_method', label: 'Metode Produksi?', type: 'select', options: ['Organik Modern', 'Hidroponik', 'Konvensional Skala Besar', 'Sustainable Farming'], condition: (a) => a.niche === 'Pertanian' || a.niche === 'Perkebunan' },
+      
+      // Pertambangan
+      { id: 'mining_type', label: 'Jenis Mineral/Tambang?', type: 'select', options: ['Batu Bara', 'Nikel', 'Emas', 'Tembaga', 'Pasir Besi'], condition: (a) => a.niche === 'Pertambangan' },
+      { id: 'mining_focus', label: 'Fokus Operasi?', type: 'select', options: ['Eksplorasi', 'Produksi & Pengolahan', 'Distribusi/Logistik'], condition: (a) => a.niche === 'Pertambangan' },
+      
+      // Elektronik
+      { id: 'elec_brand', label: 'Brand Utama?', type: 'text', placeholder: 'Misal: Samsung, Apple, Asus, atau Brand Sendiri...', condition: (a) => a.niche?.includes('Elektronik') },
+      { id: 'elec_service', label: 'Fokus Utama?', type: 'select', options: ['Penjualan Unit Baru', 'Service & Sparepart', 'Second/Refurbished Premium'], condition: (a) => a.niche?.includes('Elektronik') },
+      
+      // Wisata
+      { id: 'tour_type', label: 'Jenis Wisata?', type: 'select', options: ['Alam & Pegunungan', 'Pantai & Resor', 'Edukasi & Budaya', 'Wahana Permainan'], condition: (a) => a.niche === 'Tempat Wisata' },
+      { id: 'tour_facility', label: 'Fasilitas Unggulan?', type: 'text', placeholder: 'Misal: Glamping, Waterpark, Tour Guide...', condition: (a) => a.niche === 'Tempat Wisata' },
+      
+      // Restoran
+      { id: 'resto_cuisine', label: 'Jenis Masakan?', type: 'select', options: ['Indonesian Food', 'Western/Italian', 'Japanese/Korean', 'Coffee & Pastry', 'Seafood'], condition: (a) => a.niche === 'Restoran & Cafe' },
+      { id: 'resto_service', label: 'Layanan?', type: 'select', options: ['Dine-in & Reservation', 'Delivery & Takeaway', 'Catering Event'], condition: (a) => a.niche === 'Restoran & Cafe' },
+
+      ...COMMON_QUESTIONS
+    ]
+  },
+  { 
+    id: 'store', 
+    name: 'Toko Online', 
+    icon: ShoppingCart, 
+    prompt: 'Buatkan website Toko Online premium dengan desain minimalis seperti Apple atau Stripe. Sertakan copywriting yang persuasif, halaman katalog produk dengan grid yang elegan (2 kolom di mobile), detail produk yang mendalam, dan sistem keranjang belanja yang intuitif. Gunakan animasi hover yang halus, tipografi yang berkelas (line-height normal di mobile), dan spacing yang pas untuk semua layar.',
+    questions: [
+      { id: 'brand', label: 'Nama Brand / Toko?', type: 'text', placeholder: 'Misal: Vaslink Store, Dreamer Fashion...' },
+      { id: 'product', label: 'Produk apa yang ingin dijual?', type: 'select', options: ['Fashion & Apparel', 'Elektronik', 'Makanan & Minuman', 'Produk Digital', 'Furniture', 'Lainnya'] },
+      { id: 'style', label: 'Style desain?', type: 'select', options: ['Minimalis (Apple Style)', 'Mewah (Luxury)', 'Modern & Clean (Stripe Style)', 'Playful & Colorful'] },
+      { id: 'theme', label: 'Tema warna?', type: 'select', options: ['Dark Mode', 'Light Mode', 'Mixed'] },
+      { id: 'features', label: 'Fitur utama?', type: 'select', options: ['WhatsApp Order', 'Shopping Cart', 'Product Reviews', 'Catalog Only'] },
+      ...COMMON_QUESTIONS
+    ]
+  },
+  { 
+    id: 'portfolio', 
+    name: 'Web Portfolio', 
+    icon: UserCircle, 
+    prompt: 'Buatkan website Portfolio kreatif tingkat tinggi (Dribbble style). Sertakan section Hero dengan copywriting yang kuat, About me yang bercerita, Projects dengan layout bento-grid, dan Contact form yang modern. Gunakan efek glassmorphism dan transisi antar section yang mulus.',
+    questions: [
+      { id: 'name', label: 'Nama Lengkap Anda?', type: 'text', placeholder: 'Misal: Yana Dreamer, John Doe...' },
+      { id: 'niche', label: 'Bidang keahlian?', type: 'select', options: ['UI/UX Designer', 'Web Developer', 'Fotografer', 'Content Creator', 'Arsitek'] },
+      { id: 'style', label: 'Style desain?', type: 'select', options: ['Bento Grid (Modern)', 'Minimalist (Clean)', 'Interactive (Motion)', 'Brutalist (Bold)'] },
+      { id: 'theme', label: 'Tema warna?', type: 'select', options: ['Dark Mode', 'Light Mode', 'Vibrant Gradient'] },
+      ...COMMON_QUESTIONS
+    ]
+  },
+  { 
+    id: 'landing', 
+    name: 'Landing Page', 
+    icon: Layout, 
+    prompt: 'Buatkan Landing Page SaaS kelas dunia. Fokus pada copywriting yang menjual (Problem-Solution-Social Proof). Sertakan pricing table yang clean, FAQ interaktif, dan CTA yang mencolok. Desain harus menggunakan whitespace yang luas dan elemen visual yang tajam.',
+    questions: [
+      { id: 'product_name', label: 'Nama Produk / Layanan?', type: 'text', placeholder: 'Misal: Vaslink AI, CloudSync Pro...' },
+      { id: 'type', label: 'Jenis produk/layanan?', type: 'select', options: ['SaaS App', 'Kursus Online', 'Digital Agency', 'Mobile App Landing'] },
+      { id: 'focus', label: 'Fokus utama?', type: 'select', options: ['Konversi & Sales', 'Edukasi Produk', 'Lead Generation'] },
+      { id: 'theme', label: 'Tema warna?', type: 'select', options: ['Dark Mode', 'Light Mode', 'Corporate Blue'] },
+      ...COMMON_QUESTIONS
+    ]
+  },
+  { 
+    id: 'links', 
+    name: 'Daftar Link', 
+    icon: LinkIcon, 
+    prompt: 'Buatkan aplikasi "Link in Bio" premium. Desain harus sangat estetik dengan background gradient mesh, tombol link dengan efek glassmorphism, dan copywriting profil yang menarik. Pastikan sangat responsif dan terasa seperti aplikasi native.',
+    questions: [
+      { id: 'name', label: 'Nama / Username?', type: 'text', placeholder: 'Misal: @yanadreamer, Yana Studio...' },
+      { id: 'style', label: 'Style?', type: 'select', options: ['Glassmorphism', 'Neumorphism', 'Minimalist List', 'Card Based'] },
+      { id: 'bg', label: 'Background?', type: 'select', options: ['Mesh Gradient', 'Solid Color', 'Abstract Image'] },
+      ...COMMON_QUESTIONS
+    ]
+  },
+  { 
+    id: 'order', 
+    name: 'Form Pemesanan', 
+    icon: ClipboardList, 
+    prompt: 'Buatkan form pemesanan layanan jasa eksklusif. Sertakan copywriting yang membangun kepercayaan, validasi input real-time yang elegan, dan sistem kalkulasi biaya otomatis yang transparan. Desain harus terlihat profesional dan terpercaya.',
+    questions: [
+      { id: 'service', label: 'Jenis layanan?', type: 'select', options: ['Jasa Desain/Dev', 'Booking Jadwal', 'Custom Order Produk'] },
+      { id: 'style', label: 'Style?', type: 'select', options: ['Clean & Professional', 'Modern Floating', 'Step-by-step Form'] },
+      ...COMMON_QUESTIONS
+    ]
+  },
 ];
 
 const SYSTEM_INSTRUCTION = `You are Vaslink, a world-class AI coding agent and UI/UX designer specialized in PHP, MySQL, CSS, HTML, and Javascript. 
@@ -106,11 +227,15 @@ export const ChatInterface: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
+  const [templateAnswers, setTemplateAnswers] = useState<Record<string, string>>({});
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const [apiKeys, setApiKeys] = useState<{ geminiApiKey?: string; deepseekApiKey?: string }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -268,13 +393,51 @@ export const ChatInterface: React.FC = () => {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleTemplateClick = (template: Template) => {
+    setActiveTemplate(template);
+    // Reset answers
+    const initialAnswers: Record<string, string> = {};
+    template.questions.forEach(q => {
+      if (q.type === 'select' && q.options) {
+        initialAnswers[q.id] = q.options[0];
+      } else {
+        initialAnswers[q.id] = "";
+      }
+    });
+    setTemplateAnswers(initialAnswers);
+  };
+
+  const handleCustomTemplateSubmit = () => {
+    if (!activeTemplate) return;
+    
+    let detailedPrompt = activeTemplate.prompt;
+    detailedPrompt += "\n\n[SPESIFIKASI TAMBAHAN DARI USER]:";
+    
+    Object.entries(templateAnswers).forEach(([id, answer]) => {
+      const question = activeTemplate.questions.find(q => q.id === id);
+      if (question) {
+        detailedPrompt += `\n- ${question.label}: ${answer}`;
+      }
+    });
+
+    setInput(detailedPrompt);
+    setActiveTemplate(null);
+    
+    // Trigger submit manually by creating a fake event
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+    // We need to wait for state to update or use a ref/closure
+    // For simplicity, I'll just set the input and let the user click send, 
+    // OR I can call a modified handleSubmit that takes the prompt directly.
+  };
+
+  const handleSubmit = async (e: React.FormEvent, directPrompt?: string) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || !user) return;
+    const promptToUse = directPrompt || input;
+    if (!promptToUse.trim() || isLoading || !user) return;
 
     let sessionId = currentSessionId;
-    const userPrompt = input;
-    setInput("");
+    const userPrompt = promptToUse;
+    if (!directPrompt) setInput("");
     setIsLoading(true);
 
     try {
@@ -350,6 +513,31 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const handleFinalTemplateSubmit = () => {
+    if (!activeTemplate) return;
+    
+    let detailedPrompt = activeTemplate.prompt;
+    detailedPrompt += "\n\n[SPESIFIKASI TAMBAHAN DARI USER]:";
+    
+    Object.entries(templateAnswers).forEach(([id, answer]) => {
+      const question = activeTemplate.questions.find(q => q.id === id);
+      if (question && answer.trim()) {
+        // Only include answers for questions that satisfy their condition
+        if (!question.condition || question.condition(templateAnswers)) {
+          detailedPrompt += `\n- ${question.label}: ${answer}`;
+          
+          // Add specific instruction for ultra responsive
+          if (id === 'responsive' && answer.includes('Ultra Responsive')) {
+            detailedPrompt += ` (PENTING: Pada tampilan mobile, perkecil font-size, kurangi border-radius, perkecil margin & padding, serta sesuaikan line-height agar terlihat lebih rapat, tipis, dan profesional seperti aplikasi native premium)`;
+          }
+        }
+      }
+    });
+
+    setActiveTemplate(null);
+    handleSubmit({ preventDefault: () => {} } as React.FormEvent, detailedPrompt);
+  };
+
   const clearChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
@@ -374,6 +562,22 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const updateSessionTitle = async (sessionId: string, newTitle: string) => {
+    if (!newTitle.trim()) {
+      setEditingSessionId(null);
+      return;
+    }
+    try {
+      await setDoc(doc(db, "sessions", sessionId), {
+        title: newTitle,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      setEditingSessionId(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `sessions/${sessionId}`);
+    }
+  };
+
   const handleLogout = () => {
     signOut(auth);
   };
@@ -389,6 +593,9 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const currentSession = sessions.find(s => s.id === currentSessionId);
+  const sessionTitle = currentSession ? currentSession.title : "";
+
   return (
     <div className="flex h-full bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 overflow-hidden">
       <SettingsModal 
@@ -402,6 +609,86 @@ export const ChatInterface: React.FC = () => {
       />
 
       <AnimatePresence>
+        {activeTemplate && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setActiveTemplate(null)}
+              className="absolute inset-0 bg-zinc-950/90 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl space-y-8 overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-[#ffd700]" />
+              
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                  <activeTemplate.icon size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Kustomisasi {activeTemplate.name}</h3>
+                  <p className="text-sm text-zinc-400">Lengkapi detail berikut untuk hasil yang lebih spesifik.</p>
+                </div>
+              </div>
+
+              <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                {activeTemplate.questions.filter(q => !q.condition || q.condition(templateAnswers)).map((q) => (
+                  <div key={q.id} className="space-y-3">
+                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-500 ml-1">{q.label}</label>
+                    {q.type === 'select' ? (
+                      <div className="flex flex-wrap gap-2">
+                        {q.options?.map((opt) => (
+                          <button
+                            key={opt}
+                            onClick={() => setTemplateAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                            className={cn(
+                              "px-4 py-2.5 rounded-2xl text-[11px] font-bold transition-all border",
+                              templateAnswers[q.id] === opt
+                                ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+                                : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900"
+                            )}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={templateAnswers[q.id] || ""}
+                        onChange={(e) => setTemplateAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                        placeholder={q.placeholder}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all placeholder:text-zinc-600"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={() => setActiveTemplate(null)}
+                  className="flex-1 px-6 py-4 rounded-2xl bg-zinc-800 text-zinc-300 font-bold text-sm hover:bg-zinc-700 transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleFinalTemplateSubmit}
+                  className="flex-[2] px-6 py-4 rounded-2xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={18} />
+                  <span>Generate Project</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {sessionToDelete && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div
@@ -443,67 +730,125 @@ export const ChatInterface: React.FC = () => {
       {/* Sidebar */}
       <motion.aside
         initial={false}
-        animate={{ width: isSidebarOpen ? 280 : 0, opacity: isSidebarOpen ? 1 : 0 }}
-        className="h-full bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col overflow-hidden"
+        animate={{ width: isSidebarOpen ? 280 : 72 }}
+        className="h-full bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col overflow-hidden transition-all duration-300"
       >
-        <div className="p-6 flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-60 h-24 rounded-lg overflow-hidden flex items-start justify-center">
-              <img 
-                src="https://vaslink.site/logo-vaslink-code.png" 
-                alt="Vaslink Logo" 
-                className="w-full h-full object-contain object-top" 
-                referrerPolicy="no-referrer" 
-              />
+        <div className={cn("flex flex-col h-full", isSidebarOpen ? "p-6" : "p-4 items-center")}>
+          {isSidebarOpen ? (
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-40 h-fit-content overflow-hidden flex items-start justify-center">
+                <img 
+                  src="https://vaslink.site/logo-vaslink-code.png" 
+                  alt="Vaslink Logo" 
+                  className="w-full h-full object-contain object-top" 
+                  referrerPolicy="no-referrer" 
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mb-8">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <Bot size={18} className="text-emerald-500" />
+              </div>
+            </div>
+          )}
 
           <button
             onClick={clearChat}
-            className="flex items-center gap-3 w-full p-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-all text-sm font-medium mb-6 border border-zinc-700/50"
+            className={cn(
+              "flex items-center gap-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-all text-sm font-medium mb-6 border border-zinc-700/50",
+              isSidebarOpen ? "w-full p-3" : "w-10 h-10 justify-center p-0"
+            )}
+            title="New Session"
           >
             <Plus size={18} className="text-emerald-500" />
-            <span>New Session</span>
+            {isSidebarOpen && <span>New Session</span>}
           </button>
 
-          <div className="flex-1 space-y-4 overflow-y-auto scrollbar-none">
-            <div className="space-y-1">
-              <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-3 mb-2">History</p>
+          <div className="flex-1 space-y-4 overflow-y-auto scrollbar-none w-full">
+            {isSidebarOpen && (
               <div className="space-y-1">
-                {sessions.length === 0 ? (
-                  <div className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-800/50 text-zinc-500 text-sm text-left transition-colors cursor-not-allowed">
-                    <History size={16} />
-                    <span className="truncate">No previous sessions</span>
-                  </div>
-                ) : (
-                  sessions.map((session) => (
-                    <div 
-                      key={session.id}
-                      onClick={() => setCurrentSessionId(session.id)}
-                      className={cn(
-                        "flex items-center justify-between gap-3 w-full p-3 rounded-xl transition-all text-sm text-left group cursor-pointer",
-                        currentSessionId === session.id 
-                          ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" 
-                          : "hover:bg-zinc-800/50 text-zinc-400"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 truncate">
-                        <MessageSquare size={16} />
-                        <span className="truncate">{session.title}</span>
-                      </div>
-                      <button 
-                        onClick={(e) => deleteSession(e, session.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-700 rounded transition-all text-zinc-500 hover:text-red-400"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-3 mb-2">History</p>
+                <div className="space-y-1">
+                  {sessions.length === 0 ? (
+                    <div className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-800/50 text-zinc-500 text-sm text-left transition-colors cursor-not-allowed">
+                      <History size={16} />
+                      <span className="truncate">No previous sessions</span>
                     </div>
-                  ))
-                )}
+                  ) : (
+                    sessions.map((session) => (
+                      <div 
+                        key={session.id}
+                        onClick={() => {
+                          if (editingSessionId !== session.id) {
+                            setCurrentSessionId(session.id);
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center justify-between gap-3 w-full p-3 rounded-xl transition-all text-sm text-left group cursor-pointer",
+                          currentSessionId === session.id 
+                            ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" 
+                            : "hover:bg-zinc-800/50 text-zinc-400"
+                        )}
+                      >
+                        <div className="flex items-center gap-3 truncate flex-1 min-w-0">
+                          {editingSessionId === session.id ? (
+                            <input
+                              autoFocus
+                              className="bg-zinc-800 text-white px-2 py-1 rounded border border-emerald-500/50 outline-none w-full"
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onBlur={() => updateSessionTitle(session.id, editingTitle)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') updateSessionTitle(session.id, editingTitle);
+                                if (e.key === 'Escape') setEditingSessionId(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="truncate flex-1">{session.title}</span>
+                          )}
+                        </div>
+                        <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+                          {editingSessionId !== session.id && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingSessionId(session.id);
+                                setEditingTitle(session.title);
+                              }}
+                              className="p-1 hover:bg-zinc-700 rounded transition-all text-zinc-500 hover:text-emerald-400"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          <button 
+                            onClick={(e) => deleteSession(e, session.id)}
+                            className="p-1 hover:bg-zinc-700 rounded transition-all text-zinc-500 hover:text-red-400"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {uploadedFiles.length > 0 && (
+            {!isSidebarOpen && (
+              <div className="flex flex-col items-center gap-4">
+                <button 
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 transition-colors"
+                  title="Open Sidebar"
+                >
+                  <Code size={20} />
+                </button>
+              </div>
+            )}
+
+            {isSidebarOpen && uploadedFiles.length > 0 && (
               <div className="space-y-1 pt-4">
                 <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-3 mb-2">Active Files</p>
                 <div className="space-y-1">
@@ -523,39 +868,54 @@ export const ChatInterface: React.FC = () => {
             )}
           </div>
 
-          <div className="mt-auto pt-6 border-t border-zinc-800/50 space-y-2">
-            <div className="flex items-center gap-3 px-3 py-2 mb-2">
-              <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-emerald-500 border border-zinc-700">
-                  {user?.email?.charAt(0).toUpperCase()}
-                </div>
-                {userData?.isVerified && (
-                  <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 border-2 border-zinc-900">
-                    <Shield size={8} className="text-white" />
+          <div className={cn("mt-auto pt-6 border-t border-zinc-800/50 space-y-2 w-full", !isSidebarOpen && "flex flex-col items-center")}>
+            {isSidebarOpen ? (
+              <div className="flex items-center gap-3 px-3 py-2 mb-2">
+                <div className="relative">
+                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-emerald-500 border border-zinc-700">
+                    {user?.email?.charAt(0).toUpperCase()}
                   </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-zinc-300 truncate">{user?.email}</p>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-tighter">
-                    {userData?.role === 'admin' ? 'Administrator' : 'Vaslink User'}
-                  </p>
-                  <span className={cn(
-                    "text-[8px] px-1 rounded font-bold uppercase",
-                    userData?.status === 'Pro' ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-700 text-zinc-500"
-                  )}>
-                    {userData?.status || 'Uji Coba'}
-                  </span>
+                  {userData?.isVerified && (
+                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 border-2 border-zinc-900">
+                      <Shield size={8} className="text-white" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-zinc-300 truncate">{user?.email}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-tighter">
+                      {userData?.role === 'admin' ? 'Administrator' : 'Vaslink User'}
+                    </p>
+                    <span className={cn(
+                      "text-[8px] px-1 rounded font-bold uppercase",
+                      userData?.status === 'Pro' ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-700 text-zinc-500"
+                    )}>
+                      {userData?.status || 'Uji Coba'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 transition-colors mb-2"
+                title="Profile"
+              >
+                <UserCircle size={20} />
+              </button>
+            )}
+            
             <button 
               onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-800/50 text-zinc-400 text-sm transition-colors"
+              className={cn(
+                "flex items-center gap-3 rounded-xl hover:bg-zinc-800/50 text-zinc-400 text-sm transition-colors",
+                isSidebarOpen ? "w-full p-3" : "w-10 h-10 justify-center p-0"
+              )}
+              title="Settings"
             >
               <Settings size={18} />
-              <span>Settings</span>
+              {isSidebarOpen && <span>Settings</span>}
             </button>
           </div>
         </div>
@@ -565,17 +925,18 @@ export const ChatInterface: React.FC = () => {
       <div className="flex-1 flex flex-col h-full relative overflow-hidden">
         {/* Header */}
         <header className="border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-10">
-          <div className="max-w-3xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
+          <div className="max-w-5xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                 className="p-2 rounded-lg hover:bg-zinc-900 text-zinc-400 transition-colors"
+                title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
               >
-                <Terminal size={20} />
+                {isSidebarOpen ? <Terminal size={20} /> : <Code size={20} />}
               </button>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold tracking-tight text-white">
-                  Vaslink <span className="text-zinc-500 font-normal ml-2">/ Current Session</span>
+                  {sessionTitle}
                 </h1>
               </div>
             </div>
@@ -590,21 +951,9 @@ export const ChatInterface: React.FC = () => {
 
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-          <div className="max-w-3xl mx-auto px-4 py-8 md:px-8 w-full space-y-8">
+          <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 w-full space-y-8">
             {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-55 h-auto flex items-center justify-center overflow-hidden"
-              >
-                <img 
-                  src="https://vaslink.site/logo-vaslink-code.png" 
-                  alt="Vaslink Logo" 
-                  className="block w-full h-full object-contain" 
-                  referrerPolicy="no-referrer" 
-                />
-              </motion.div>
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-white tracking-tight">Apa yang ingin kamu buat hari ini?</h2>
                 <p className="text-zinc-400 max-w-md mx-auto">
@@ -634,7 +983,7 @@ export const ChatInterface: React.FC = () => {
                   {TEMPLATES.map((template) => (
                     <button
                       key={template.id}
-                      onClick={() => setInput(template.prompt)}
+                      onClick={() => handleTemplateClick(template)}
                       className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800 hover:border-[#ffd700]/50 hover:bg-zinc-900 transition-all group"
                     >
                       <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-[#ffd700] group-hover:bg-[#ffd700]/10 transition-all">
@@ -655,24 +1004,14 @@ export const ChatInterface: React.FC = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
-                  "flex gap-4 p-6 rounded-2xl border transition-all",
-                  msg.role === "assistant" 
-                    ? "bg-zinc-900/30 border-zinc-800/50" 
-                    : "bg-zinc-900/80 border-zinc-700/50 shadow-lg"
+                  "flex flex-col gap-2 transition-all",
+                  msg.role === "assistant" ? "text-zinc-100" : "text-emerald-400/80 italic items-end"
                 )}
               >
                 <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
-                  msg.role === "assistant" 
-                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                    : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                  "flex-1 min-w-0",
+                  msg.role !== "assistant" && "bg-zinc-900/50 border border-zinc-800/50 p-4 rounded-2xl max-w-[85%]"
                 )}>
-                  {msg.role === "assistant" ? <Bot size={20} /> : <User size={20} />}
-                </div>
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 mb-1">
-                    {msg.role === "assistant" ? "Vaslink AI" : "You"}
-                  </div>
                   <div className="prose prose-invert prose-zinc max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-code:text-emerald-400 prose-headings:text-white prose-strong:text-emerald-400">
                     <ReactMarkdown
                       components={{
@@ -720,13 +1059,13 @@ export const ChatInterface: React.FC = () => {
 
       {/* Input Area */}
       <div className="border-t border-zinc-800/50 bg-zinc-950/80 backdrop-blur-md sticky bottom-0">
-        <div className="max-w-3xl mx-auto p-6 w-full">
+        <div className="max-w-5xl mx-auto p-6 w-full">
           <form onSubmit={handleSubmit} className="w-full relative">
             {/* File Preview above input */}
             {uploadedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {uploadedFiles.map((file, idx) => (
-                  <div key={idx} className="flex items-center gap-2 p-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-[12px] text-zinc-300">
+                  <div key={idx} className="flex items-center gap-2 p-2 px-3 rounded-full bg-zinc-900 border border-zinc-800 text-[12px] text-zinc-300">
                     <FileCode size={14} className="text-emerald-500" />
                     <span className="max-w-[150px] truncate">{file.name}</span>
                     <button type="button" onClick={() => removeFile(idx)} className="text-zinc-500 hover:text-zinc-300">
@@ -750,10 +1089,10 @@ export const ChatInterface: React.FC = () => {
                     }
                   }}
                   placeholder="Jelaskan apa yang ingin anda buat / pengeditan kode yang anda berikan..."
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 pr-16 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all resize-none min-h-[60px] max-h-40 text-zinc-100 placeholder:text-zinc-600 shadow-inner overflow-y-auto"
+                  className="w-full bg-zinc-900 border-none rounded-[36px] px-8 py-5 pr-16 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all resize-none min-h-[80px] max-h-40 text-zinc-100 placeholder:text-zinc-600 shadow-2xl overflow-y-auto"
                   rows={1}
                 />
-                <div className="absolute right-3 bottom-3 flex items-center gap-2">
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   <input
                     type="file"
                     ref={fileInputRef}

@@ -111,11 +111,11 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-[#080808] flex items-center justify-center p-4 font-sans">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#1A2335] border border-[#2A3450] rounded-2xl p-8 shadow-2xl"
+        className="w-full max-w-md bg-[#111112] rounded-2xl p-8 shadow-2xl"
       >
         <div className="flex flex-col items-center">
           <div className="w-48 h-fit-content flex items-center justify-center overflow-hidden">
@@ -140,7 +140,7 @@ export const Login: React.FC = () => {
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#0B0F17] border border-[#2A3450] rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-[#ffd700]/50 focus:border-[#ffd700] transition-all"
+                className="w-full bg-[#111112] border border-[#2A3450] rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-[#ffd700]/50 focus:border-[#ffd700] transition-all"
                 placeholder="email@example.com"
                 required
               />
@@ -155,7 +155,7 @@ export const Login: React.FC = () => {
                 type={showPassword ? "text" : "password"} 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#0B0F17] border border-[#2A3450] rounded-xl py-3 pl-12 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-[#ffd700]/50 focus:border-[#ffd700] transition-all"
+                className="w-full bg-[#111112] border border-[#2A3450] rounded-xl py-3 pl-12 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-[#ffd700]/50 focus:border-[#ffd700] transition-all"
                 placeholder="••••••••"
                 required
               />

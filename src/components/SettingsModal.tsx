@@ -239,62 +239,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </section>
 
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2 text-zinc-400 text-xs font-bold uppercase tracking-widest">
-                      <Shield size={14} />
-                      <span>Security & Keys</span>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Gemini API Key</label>
-                          {isAdmin && (
-                            <span className="text-[10px] text-emerald-500 font-bold uppercase">Admin Only</span>
-                          )}
+                  {isAdmin && (
+                    <>
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                          <Shield size={14} />
+                          <span>Security & Keys</span>
                         </div>
-                        <div className="relative">
-                          <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                          <input
-                            type="password"
-                            value={geminiKey}
-                            onChange={(e) => setGeminiKey(e.target.value)}
-                            disabled={!isAdmin}
-                            placeholder={isAdmin ? "Enter Gemini API Key..." : "Configured by Admin"}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50"
-                          />
-                        </div>
-                      </div>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Gemini API Key</label>
+                              <span className="text-[10px] text-emerald-500 font-bold uppercase">Admin Only</span>
+                            </div>
+                            <div className="relative">
+                              <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+                              <input
+                                type="password"
+                                value={geminiKey}
+                                onChange={(e) => setGeminiKey(e.target.value)}
+                                disabled={!isAdmin}
+                                placeholder="Enter Gemini API Key..."
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50"
+                              />
+                            </div>
+                          </div>
 
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">DeepSeek API Key</label>
-                          {isAdmin && (
-                            <span className="text-[10px] text-emerald-500 font-bold uppercase">Admin Only</span>
-                          )}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">DeepSeek API Key</label>
+                              <span className="text-[10px] text-emerald-500 font-bold uppercase">Admin Only</span>
+                            </div>
+                            <div className="relative">
+                              <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+                              <input
+                                type="password"
+                                value={deepseekKey}
+                                onChange={(e) => setDeepseekKey(e.target.value)}
+                                disabled={!isAdmin}
+                                placeholder="Enter DeepSeek API Key..."
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div className="relative">
-                          <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                          <input
-                            type="password"
-                            value={deepseekKey}
-                            onChange={(e) => setDeepseekKey(e.target.value)}
-                            disabled={!isAdmin}
-                            placeholder={isAdmin ? "Enter DeepSeek API Key..." : "Configured by Admin"}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </section>
+                      </section>
 
-                  <div className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 flex gap-3">
-                    <Info size={18} className="text-emerald-500 shrink-0" />
-                    <p className="text-xs text-zinc-500 leading-relaxed">
-                      {isAdmin 
-                        ? "As an admin, you can manually update API keys. These will be stored in Firestore and used if environment variables are missing."
-                        : "API keys are managed by administrators. If the app is not working, please contact your administrator."}
-                    </p>
-                  </div>
+                      <div className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 flex gap-3">
+                        <Info size={18} className="text-emerald-500 shrink-0" />
+                        <p className="text-xs text-zinc-500 leading-relaxed">
+                          As an admin, you can manually update API keys. These will be stored in Firestore and used if environment variables are missing.
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
