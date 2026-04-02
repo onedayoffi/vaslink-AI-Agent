@@ -37,7 +37,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
   };
 
   return (
-    <div className="relative group my-4 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 shadow-xl max-h-[600px] flex flex-col">
+    <div className="relative group my-4 rounded-none overflow-hidden border border-zinc-800 bg-zinc-950 shadow-xl max-h-[600px] flex flex-col">
       <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/90 backdrop-blur-sm border-b border-zinc-800 sticky top-0 z-10 shrink-0">
         <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
           {language || "code"}
@@ -45,14 +45,14 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
         <div className="flex items-center gap-2">
           <button
             onClick={downloadCode}
-            className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-100"
+            className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-100 cursor-pointer"
             title="Download code"
           >
             <Download size={14} />
           </button>
           <button
             onClick={copyToClipboard}
-            className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-100"
+            className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-100 cursor-pointer"
             title="Copy code"
           >
             {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}

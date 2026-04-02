@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { motion, AnimatePresence } from "motion/react";
 import { Send, Bot, User, Loader2, Sparkles, Terminal, Settings, History, Plus, Github, MessageSquare, Paperclip, X, FileCode, LogOut, Trash2, Shield, CheckCircle, Clock, Layout, ShoppingCart, UserCircle, Link as LinkIcon, ClipboardList, Code, Globe, Edit2 } from "lucide-react";
-import { generateCode, Message } from "../services/aiService";
+import { generateCode, generateCodeStream, extractMemory, Message, UserMemory } from "../services/aiService";
 import { CodeBlock } from "./CodeBlock";
 import { SettingsModal } from "./SettingsModal";
 import { auth, db } from "../firebase";
@@ -227,6 +227,7 @@ export const ChatInterface: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState<string | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [templateAnswers, setTemplateAnswers] = useState<Record<string, string>>({});
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
@@ -236,6 +237,7 @@ export const ChatInterface: React.FC = () => {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [userMemory, setUserMemory] = useState<UserMemory>({});
   const [apiKeys, setApiKeys] = useState<{ geminiApiKey?: string; deepseekApiKey?: string }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -247,7 +249,7 @@ export const ChatInterface: React.FC = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, streamingMessage]);
 
   // Handle flexible textarea height
   useEffect(() => {
@@ -293,6 +295,19 @@ export const ChatInterface: React.FC = () => {
       }
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, "settings/api_keys");
+    });
+    return unsubscribe;
+  }, [user]);
+
+  // Listen for User Memory
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onSnapshot(doc(db, "memories", user.uid), (doc) => {
+      if (doc.exists()) {
+        setUserMemory(doc.data() as UserMemory);
+      }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `memories/${user.uid}`);
     });
     return unsubscribe;
   }, [user]);
@@ -486,23 +501,65 @@ export const ChatInterface: React.FC = () => {
         finalInput = `[CONTEXT FROM UPLOADED FILES]\n${fileContext}\n\n[USER REQUEST]\n${userPrompt}`;
       }
 
-      const response = await generateCode(
+      const engineToUse = (localStorage.getItem("ai_engine") as "gemini" | "deepseek") || "gemini";
+      const stream = generateCodeStream(
         [...messages, { role: "user", content: finalInput }], 
         SYSTEM_INSTRUCTION,
         userData?.status === 'Pro',
-        apiKeys.geminiApiKey
+        engineToUse === "gemini" ? apiKeys.geminiApiKey : apiKeys.deepseekApiKey,
+        engineToUse,
+        userMemory
       );
+
+      let fullResponse = "";
+      const assistantMessageId = crypto.randomUUID();
       
+      // We keep isLoading true until the first chunk arrives
+      let firstChunk = true;
+
+      for await (const chunk of stream) {
+        if (firstChunk) {
+          setIsLoading(false);
+          setStreamingMessage("");
+          firstChunk = false;
+        }
+        fullResponse += chunk;
+        setStreamingMessage(fullResponse);
+      }
+      
+      setStreamingMessage(null);
+
       // Add assistant message to Firestore
       try {
         await addDoc(collection(db, "sessions", sessionId!, "messages"), {
-          id: crypto.randomUUID(),
+          id: assistantMessageId,
           role: "assistant",
-          content: response,
+          content: fullResponse,
           createdAt: serverTimestamp()
         });
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `sessions/${sessionId}/messages`);
+      }
+
+      // Update Memory in background
+      if (user) {
+        const newMemory = await extractMemory(
+          [...messages, { role: "user", content: finalInput }, { role: "assistant", content: fullResponse }],
+          userMemory,
+          apiKeys.geminiApiKey
+        );
+
+        if (newMemory) {
+          try {
+            await setDoc(doc(db, "memories", user.uid), {
+              ...newMemory,
+              userId: user.uid,
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          } catch (err) {
+            console.error("Failed to update memory:", err);
+          }
+        }
       }
 
     } catch (error) {
@@ -738,7 +795,7 @@ export const ChatInterface: React.FC = () => {
             <div className="flex items-center gap-3 mb-8">
               <div className="w-40 h-fit-content overflow-hidden flex items-start justify-center">
                 <img 
-                  src="https://vaslink.site/logo-vaslink-code.png" 
+                  src="https://vaslink.site/vaslink.png" 
                   alt="Vaslink Logo" 
                   className="w-full h-full object-contain object-top" 
                   referrerPolicy="no-referrer" 
@@ -960,22 +1017,6 @@ export const ChatInterface: React.FC = () => {
                   Saya seorang Spesialis PHP, MySQL, CSS, HTML, dan Javascript. Minta saya untuk membuat komponen, men-debug skrip, atau mendesain antarmuka profesional..
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-                {[
-                  "Build a secure PHP login system with MySQL",
-                  "Create a modern CSS grid layout for a dashboard",
-                  "Write a Javascript function for real-time validation",
-                  "Design a professional landing page with HTML/Tailwind",
-                ].map((suggestion, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setInput(suggestion)}
-                    className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 transition-all text-left text-sm text-zinc-300 group"
-                  >
-                    <span className="group-hover:text-emerald-400 transition-colors">{suggestion}</span>
-                  </button>
-                ))}
-              </div>
 
               <div className="w-full pt-8">
                 <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-4">Pilih Template Proyek</p>
@@ -1005,7 +1046,7 @@ export const ChatInterface: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
                   "flex flex-col gap-2 transition-all",
-                  msg.role === "assistant" ? "text-zinc-100" : "text-emerald-400/80 italic items-end"
+                  msg.role === "assistant" ? "text-yellow-500" : "text-lime-100 italic items-end"
                 )}
               >
                 <div className={cn(
@@ -1036,6 +1077,39 @@ export const ChatInterface: React.FC = () => {
                 </div>
               </motion.div>
             ))}
+
+            {streamingMessage !== null && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col gap-2 transition-all text-yellow-500"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="prose prose-invert prose-zinc max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-code:text-emerald-400 prose-headings:text-white prose-strong:text-emerald-400">
+                    <ReactMarkdown
+                      components={{
+                        code({ node, inline, className, children, ...props }: any) {
+                          const match = /language-(\w+)/.exec(className || "");
+                          return !inline && match ? (
+                            <CodeBlock
+                              language={match[1]}
+                              value={String(children).replace(/\n$/, "")}
+                            />
+                          ) : (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
+                        },
+                      }}
+                    >
+                      {streamingMessage}
+                    </ReactMarkdown>
+                    <span className="inline-block w-2 h-5 bg-emerald-500 ml-1 animate-cursor align-middle" />
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
           
           {isLoading && (
@@ -1049,7 +1123,7 @@ export const ChatInterface: React.FC = () => {
               </div>
               <div className="flex items-center gap-3 text-zinc-500 text-sm italic">
                 <Loader2 size={16} className="animate-spin text-emerald-500" />
-                <span>Vaslink is thinking...</span>
+                <span>Vaslink sedang berfikir...</span>
               </div>
             </motion.div>
           )}

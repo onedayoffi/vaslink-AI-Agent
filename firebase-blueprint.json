@@ -48,6 +48,19 @@
         "deepseekApiKey": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Memory": {
+      "title": "Memory",
+      "description": "Persistent memory for the AI agent",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "design": { "type": "string", "description": "Design preferences" },
+        "coding": { "type": "string", "description": "Coding preferences" },
+        "behavior": { "type": "string", "description": "Personal info and behavior" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "updatedAt"]
     }
   },
   "firestore": {
@@ -58,6 +71,10 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "User documents"
+    },
+    "/memories/{userId}": {
+      "schema": "Memory",
+      "description": "User-specific persistent memory"
     },
     "/sessions/{sessionId}": {
       "schema": "Session",

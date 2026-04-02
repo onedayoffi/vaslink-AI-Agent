@@ -36,6 +36,9 @@ export const Login: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
+      // Set persistence based on rememberMe
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
@@ -57,7 +60,27 @@ export const Login: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Google Auth error:", err);
-      setError(`Terjadi kesalahan saat login dengan Google: ${err.message || 'Unknown error'}`);
+      
+      // Handle specific Firebase Auth errors gracefully
+      if (err.code === 'auth/popup-closed-by-user') {
+        // Don't show a scary error if the user just closed the popup themselves
+        // Just stop the loading state
+        setIsLoading(false);
+        return;
+      }
+      
+      let message = `Terjadi kesalahan saat login dengan Google: ${err.message || 'Unknown error'}`;
+      if (err.code === 'auth/cancelled-popup-request') {
+        message = "Permintaan login dibatalkan.";
+      } else if (err.code === 'auth/popup-blocked') {
+        message = "Popup login diblokir oleh browser. Silakan izinkan popup untuk situs ini.";
+      } else if (err.code === 'auth/unauthorized-domain') {
+        message = "Domain ini tidak diizinkan untuk login Google. Silakan tambahkan domain/localhost ke 'Authorized Domains' di Firebase Console.";
+      } else if (err.code === 'auth/internal-error') {
+        message = "Terjadi kesalahan internal. Silakan coba lagi.";
+      }
+      
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -162,7 +185,7 @@ export const Login: React.FC = () => {
         <div className="flex flex-col items-center">
           <div className="w-48 h-fit-content flex items-center justify-center overflow-hidden">
             <img 
-              src="https://vaslink.site/logo-vaslink-code.png" 
+              src="https://vaslink.site/vaslink.png" 
               alt="Vaslink Logo" 
               className="w-full h-full object-contain p-2" 
               referrerPolicy="no-referrer" 
@@ -257,7 +280,7 @@ export const Login: React.FC = () => {
             className="w-full bg-white hover:bg-gray-100 text-black font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-            <span>Sign in with Google</span>
+            <span>{isRegistering ? 'Daftar dengan Google' : 'Masuk dengan Google'}</span>
           </button>
         </form>
 

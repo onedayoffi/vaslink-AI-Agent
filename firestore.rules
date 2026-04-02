@@ -57,10 +57,23 @@ service cloud.firestore {
              data.content.size() > 0;
     }
 
+    function isValidMemory(data) {
+      return data.keys().hasAll(['userId', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             (!('design' in data) || data.design is string) &&
+             (!('coding' in data) || data.coding is string) &&
+             (!('behavior' in data) || data.behavior is string);
+    }
+
     // Rules
     match /settings/api_keys {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /memories/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow write: if isAuthenticated() && isOwner(userId) && isValidMemory(request.resource.data);
     }
 
     match /users/{userId} {
